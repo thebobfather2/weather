@@ -1,86 +1,155 @@
-// api.openweathermap.org/data/2.5/forecast?lat={lat}&lon={lon}&appid={d156093b6a1df25f03f07a0f8e88abc2}
+$(window).on('load', function () {
+    currentLocation();
+    checkLocalStorage();
+});
+var APIKey = "2fcd1afb1e82b6acb910fcb96f7fbb7c";
+var q = "";
+var now = moment();
+var currentDate = now.format('MMMM Do YYYY || h:mm a');
+$("#currentDay").text(currentDate);
 
-// var year = dayjs().format("YYYY");
-// var currentMonth = dayjs().format('MMMM');
+$("#search-button").on("click", function (event) {
+    event.preventDefault();
 
-//need to convert string to readable output
-var today = Date.now();
+    q = $("#city-input").val();
+    if (q === '') {
+        return alert('Please Enter Valid City Name ! ');
+    }
+    getWeather(q);
+
+    saveToLocalStorage(q);
+});
+
+function createRecentSearchBtn(q) {
+    var newLi = $("<li>")
+    var newBtn = $('<button>');
+    newBtn.attr('id', 'extraBtn');
+    newBtn.addClass("button is-small recentSearch");
+    newBtn.text(q);
+    newLi.append(newBtn)
+    $("#historyList").prepend(newLi);
+    $("#extraBtn").on("click", function () {
+        var newQ = $(this).text();
+        getWeather(newQ);
+    });
+}
+
+function convertToC(fahrenheit) {
+    var fTempVal = fahrenheit;
+    var cTempVal = (fTempVal - 32) * (5 / 9);
+    var celcius = Math.round(cTempVal * 10) / 10;
+    return celcius;
+  }
 
 
-const timeEl = document.getElementById('time')
-const dateEl = document.getElementById('date')
-const currentWeatherItemsEl = document.getElementById('current-weather-items')
-const timeZone = document.getElementById('time-zone')
-const countryEl = document.getElementById('country')
-const weatherForecastEl = document.getElementById('weather-forecast')
-const currentTempEl = document.getElementById('current-temp')
-var searchBtn = document.getElementById("search")
-var cityHistory = JSON.parse(localStorage.getItem("cityHistory")) || []
+function getWeather(q) {
+    var queryURL = "https://api.openweathermap.org/data/2.5/weather?q=" + q + "&units=imperial&appid=" + APIKey;
+    $.ajax({
+        url: queryURL,
+        method: "GET",
+        error: (err => {
+            alert("Your city was not found. Check your spelling or enter a city code")
+            return;
+          })
+    }).then(function (response) {
+        console.log(response)
+        $(".cityList").empty()
+        $("#days").empty()
+        var celcius = convertToC(response.main.temp);
+        var cityMain1 = $("<div col-12>").append($("<p><h2>" + response.name + ' (' + currentDate + ')' + "</h2><p>"));
+        var image = $('<img class="imgsize">').attr('src', 'http://openweathermap.org/img/w/' + response.weather[0].icon + '.png');        
+        var degreeMain = $('<p>').text('Temperature : ' + response.main.temp + ' °F (' + celcius + '°C)');
+        var humidityMain = $('<p>').text('Humidity : ' + response.main.humidity + '%');
+        var windMain = $('<p>').text('Wind Speed : ' + response.wind.speed + 'MPH');       
+        var uvIndexcoord = '&lat=' + response.coord.lat + '&lon=' + response.coord.lon;
+        var cityId = response.id;
 
+        displayUVindex(uvIndexcoord);
+        displayForecast(cityId);
 
-const API_KEY = '2fcd1afb1e82b6acb910fcb96f7fbb7c'
-const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Jun', 'Jul', 'Aug', 'Oct', 'Nov', 'Dec'];
-// setInterval(() => {
-//     const time = new Date;
-//     const month = time.getMonth();
-//     const date = time.getDate();
-//     const day = time.getDay();
-//     const hour = time.getHours();
-//     const hoursIn12 = hour >= 13 ? hour % 12 : hour;
-//     const minute = time.getMinutes();
-//     const ampm = hour >= 12 ? 'PM' : 'AM'
+        cityMain1.append(image).append(degreeMain).append(humidityMain).append(windMain);
+        $('#cityList').empty();
+        $('#cityList').append(cityMain1);
+    });
+}
 
-//     timeEl.innerHTML = hoursIn12 + ':' + minute + ' ' + `<span id="am-pm">${ampm}</span>`
-//     dateEl.innerHTML = days[day] + ', ' + date + ' ' + months[month]
+function displayUVindex(uv) {
+    $.ajax({
+        url: "https://api.openweathermap.org/data/2.5/uvi?appid=" + APIKey + uv,
+        method: "GET"
+    }).then(function (response) {
+        var UVIndex = $("<p><span>");
+        UVIndex.attr("class", "badge badge-danger");
+        UVIndex.text(response.value);
+        $("#cityList").append('UV-Index : ').append(UVIndex);       
+    });
+}
 
-// }, 1000);
-
-dateEl.innerText = today;
-
-function getWeatherData(city) {
-    console.log('Hello world')
-    var geourl = "http://api.openweathermap.org/geo/1.0/direct?q=" + city + "&limit=5&appid=" + API_KEY
-    fetch(geourl).then(response => {
-        return response.json()
-    }).then(data => {
-        console.log(data)
-        var lat = data[0].lat
-        var lon = data[0].lon
-        var cityName = data[0].name
-        if (!cityHistory.includes(cityName)) {
-            cityHistory.push(cityName)
-            console.log(cityHistory)
-            localStorage.setItem("cityHistory", JSON.stringify(cityHistory))
+function displayForecast(c) {
+    $.ajax({
+        url: "https://api.openweathermap.org/data/2.5/forecast?id=" + c + "&units=imperial&APPID=" + APIKey,
+        method: "GET",
+    }).then(function (response) {
+        var arrayList = response.list;
+        for (var i = 0; i < arrayList.length; i++) {
+            if (arrayList[i].dt_txt.split(' ')[1] === '12:00:00') {
+                console.log(arrayList[i]);
+                var celcius = convertToC(arrayList[i].main.temp);
+                var cityMain = $('<div>');
+                cityMain.addClass('col forecast bg-primary text-white ml-3 mb-3 rounded>');
+                var date5 = $("<h5>").text(response.list[i].dt_txt.split(" ")[0]);
+                var image = $('<img>').attr('src', 'http://openweathermap.org/img/w/' + arrayList[i].weather[0].icon + '.png');
+                var degreeMain = $('<p>').text('Temp : ' + arrayList[i].main.temp + ' °F ('+ celcius + '°C)');               
+                var humidityMain = $('<p>').text('Humidity : ' + arrayList[i].main.humidity + '%');
+                var windMain = $('<p>').text('Wind Speed : ' + arrayList[i].wind.speed + 'MPH');                
+                cityMain.append(date5).append(image).append(degreeMain).append(humidityMain).append(windMain);
+                $('#days').append(cityMain);
+            }
         }
-        var weatherUrl = "https://api.openweathermap.org/data/2.5/weather?lat=" + lat + "&lon=" + lon + "&units=imperial&appid=" + API_KEY
-        fetch(weatherUrl).then(response => {
-            return response.json()
-        }).then(data => {
-            displayWeather(data)
-        })
-    })
+    });
+};
+
+function currentLocation() {
+    $.ajax({
+        url: "https://freegeoip.app/json/",
+        method: "GET",
+    }).then(function (response) {
+        q = response.city || 'exton';
+        console.log(q);
+        getWeather(q);
+    });
+};
+
+function checkLocalStorage() {
+    var storedData = localStorage.getItem('queries');
+    var dataArray = [];
+    if (!storedData) {
+        console.log("no data stored");
+    } else {
+        storedData.trim();
+        dataArray = storedData.split(',');
+        for (var i = 0; i < dataArray.length; i++) {
+            createRecentSearchBtn(dataArray[i]);
+        }
+    }
+};
+
+function saveToLocalStorage(q) {
+    var data = localStorage.getItem('queries');
+    if (data) {
+        console.log(data, q)
+
+    } else {
+        data = q;
+        localStorage.setItem('queries', data);
+    }
+    if (data.indexOf(q) === -1) {
+        data = data + ',' + q;
+        localStorage.setItem('queries', data);
+        createRecentSearchBtn(q);
+    }
 }
 
-function displayWeather(data) {
-    console.log(data)
-    var cityTitle = document.createElement("h3");
-    cityTitle.textContent = data.name
-    document.querySelector(".date-container").appendChild(cityTitle)
-    weatherDescription.innerText = data.weather[0].main
-    tempMin.innerText = data.main.temp_min
-    tempMax.innerText = data.main.temp_max
-    windSpeed.innerText = data.wind.speed
-    humidity.innerText = data.main.humidity
-}
-
-searchBtn.addEventListener("click", function () {
-    var searchInput = document.getElementById("input").value
-    getWeatherData(searchInput);
-})
-
-// fetch(geourl).then(response => {
-//     return response.json()
-// }).then(data => {
-//     console.log(data)
-// })
+$("#clear-history").on("click", function (event) {
+    $("#historyList").empty();
+});
