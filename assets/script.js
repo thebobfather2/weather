@@ -2,7 +2,9 @@
 
 // var year = dayjs().format("YYYY");
 // var currentMonth = dayjs().format('MMMM');
-var today = DateEl.now;
+
+//need to convert string to readable output
+var today = Date.now();
 
 
 const timeEl = document.getElementById('time')
@@ -76,8 +78,6 @@ searchBtn.addEventListener("click", function () {
     var searchInput = document.getElementById("input").value
     getWeatherData(searchInput);
 })
-
-
 
 // fetch(geourl).then(response => {
 //     return response.json()
